@@ -129,6 +129,7 @@ def analyze(code, meta, history):
     row = {
         "code": code, "name": name, "sector": meta["sector"], "default": meta["default"],
         "price": round(float(close.iloc[-1]), 2),
+        "last_trade": close.index[-1].strftime("%Y-%m-%d"),
         "chg_1d": round(float((close.iloc[-1] / close.iloc[-2] - 1) * 100), 2),
         "chg_5d": round(float((close.iloc[-1] / close.iloc[-6] - 1) * 100), 2),
         "chg_1y": round(float(x["year_ret"]), 1),
