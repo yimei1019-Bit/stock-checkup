@@ -322,8 +322,8 @@
   const sign = (v) => (v == null ? '－' : (v > 0 ? '+' : '') + Number(v).toFixed(2) + '%');
   const fmt = (v) => Number(v).toLocaleString('zh-TW', { maximumFractionDigits: 2 });
   const store = {
-    get(k, d) { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } },
-    set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} },
+    get(k, d) { try { const v = localStorage.getItem('stock.' + k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } },
+    set(k, v) { try { localStorage.setItem('stock.' + k, JSON.stringify(v)); } catch (e) {} },
   };
   const css = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
   const genTime = new Date(D.generated.replace(' ', 'T') + ':00+08:00');
