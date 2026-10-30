@@ -38,6 +38,8 @@
   .inner { max-width: 46rem; margin: 0 auto; }
   .muted { color: var(--muted); font-size: .8rem; margin: 0; }
   .up { color: var(--up); } .down { color: var(--down); } .flat { color: var(--muted); } .bad { color: var(--warn); }
+  .live { color: var(--accent); font-weight: 700; }
+  .hero .live { color: var(--gold); }
 
   /* 頂欄 */
   .appbar { background: var(--ink); color: var(--ink-fg); position: sticky; top: 0; z-index: 20; padding-top: env(safe-area-inset-top, 0px); }
@@ -340,7 +342,7 @@
   // 價格日期：大部分股票的最新交易日；比它舊的代表 Yahoo 少了資料
   const md = (d) => (d ? d.slice(5).replace('-', '/') : '－');
   const LATEST = D.stocks.reduce((m, s) => (s.last_trade && s.last_trade > m ? s.last_trade : m), '');
-  const stale = (s) => s.last_trade && s.last_trade < LATEST;
+  const stale = (s) => !s.live && s.last_trade && s.last_trade < LATEST;
   $('#price-note').textContent = '價格是 ' + md(LATEST) + ' 的收盤價，每個交易日下午 2:40 後更新，不是盤中即時價。' +
     (D.stocks.some(stale) ? '橘色日期的股票，Yahoo 還沒有最新一天的資料。' : '');
 
@@ -369,7 +371,8 @@
     b.addEventListener('click', () => openStock(s.code));
     const nm = el('div', 'sname');
     nm.append(el('b', null, s.name), el('small', null, s.code + (s.sector ? '・' + s.sector : '')));
-    if (stale(s)) nm.append(el('small', 'bad', '・' + md(s.last_trade) + ' 收盤'));
+    if (s.live) nm.append(el('small', 'live', '・盤中 ' + s.live.time));
+    else if (stale(s)) nm.append(el('small', 'bad', '・' + md(s.last_trade) + ' 收盤'));
     const pr = el('div', 'sprice');
     pr.append(el('b', dir(s.chg_1d), fmt(s.price)), el('span', 'pill ' + dir(s.chg_1d), sign(s.chg_1d)));
     b.append(ring(s.score), nm, spark(s.spark), pr);
@@ -599,8 +602,9 @@
     const s = BY[code];
     current = code; page = null;
     $('#d-title').textContent = s.name + ' ' + s.code;
-    $('#d-sub').textContent = s.code + (s.sector ? '・' + s.sector : '') + '・' + md(s.last_trade) + ' 收盤價' +
-      (stale(s) ? '（Yahoo 還沒有 ' + md(LATEST) + ' 的資料）' : '');
+    $('#d-sub').replaceChildren(document.createTextNode(s.code + (s.sector ? '・' + s.sector : '') + '・'),
+      s.live ? el('span', 'live', '盤中 ' + md(s.live.date) + ' ' + s.live.time) :
+      document.createTextNode(md(s.last_trade) + ' 收盤價' + (stale(s) ? '（Yahoo 還沒有 ' + md(LATEST) + ' 的資料）' : '')));
     $('#d-price').textContent = fmt(s.price);
     $('#d-price').className = 'd-price ' + dir(s.chg_1d);
     $('#d-chg').replaceChildren(el('span', dir(s.chg_1d), '今日 ' + sign(s.chg_1d)), el('span', 'muted', '　'), el('span', dir(s.chg_5d), '5 日 ' + sign(s.chg_5d)), el('span', 'muted', '　'), el('span', dir(s.chg_1y), '1 年 ' + sign(s.chg_1y)));
@@ -618,10 +622,14 @@
     catch (e) { $('#k-chart').replaceChildren(el('div', 'empty', '資料載入失敗，請重新整理再試一次。')); return; }
     if (current !== code) return;
     page = data;
+    const q = s.live;
+    if (q && (!data.ohlc.length || data.ohlc[data.ohlc.length - 1][0] < q.date)) {
+      data.ohlc.push([q.date, q.open, q.high, q.low, q.price, q.volume]);  // 盤中先畫一根今天的 K 棒
+    }
     const bars = data.ohlc, last = bars[bars.length - 1], prev = bars[bars.length - 2];
 
     if (last) {
-      $('#d-day-title').textContent = '最新一天（' + last[0] + '）';
+      $('#d-day-title').textContent = q && last[0] === q.date ? '今天盤中（' + md(q.date) + ' ' + q.time + '，還沒收盤）' : '最新一天（' + last[0] + '）';
       const amp = prev ? (last[2] - last[3]) / prev[4] * 100 : null;
       const cell = (label, v, cls) => { const d = el('div'); d.append(el('span', null, label), el('b', cls || null, v)); return d; };
       $('#d-ohlc').replaceChildren(cell('開盤', fmt(last[1])), cell('最高', fmt(last[2]), 'up'), cell('最低', fmt(last[3]), 'down'),
@@ -684,7 +692,32 @@
   $('#back').addEventListener('click', () => { if (cameFromHome) history.back(); else location.hash = ''; });
   window.addEventListener('hashchange', () => { cameFromHome = !$('#home').hidden; route(); });
 
+  // ---------- 盤中價格（live.json，交易時間約每 20 分鐘更新） ----------
+  async function loadLive() {
+    let live;
+    try {
+      const r = await fetch('live.json?t=' + Date.now());
+      if (!r.ok) return;
+      live = await r.json();
+    } catch (e) { return; }
+    let n = 0;
+    for (const [code, q] of Object.entries(live.quotes || {})) {
+      const s = BY[code];
+      if (!s || !(q.date > (s.last_trade || '')) || !q.prev) continue;
+      s.live = q;
+      s.price = q.price;
+      s.chg_1d = +((q.price / q.prev - 1) * 100).toFixed(2);
+      n++;
+    }
+    if (!n) return;
+    $('#price-note').replaceChildren(el('span', 'live', '盤中價格 ' + md(live.date) + ' ' + live.time),
+      document.createTextNode('（交易時間約每 20 分鐘更新，比券商 App 慢）。分數和走勢線是前一個交易日收盤算的。'));
+    drawMine(); drawRank();
+    if (!$('#detail').hidden && current) showDetail(current);
+  }
+
   drawMine(); drawRank(); drawSectors(); showTab(tab);
+  loadLive();
   route();
 })();
 </script>
