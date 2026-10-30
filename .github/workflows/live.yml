@@ -1,0 +1,41 @@
+# 交易時間（台灣 09:00～13:40）每 20 分鐘抓一次盤中價格。GitHub 的排程用 UTC：01:00～05:40
+# 註：GitHub 排程常會延遲幾分鐘到十幾分鐘，所以價格會比券商 App 慢
+name: 盤中價格更新
+
+on:
+  schedule:
+    - cron: "*/20 1-5 * * 1-5"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: site-data
+  cancel-in-progress: false
+
+jobs:
+  live:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: 安裝套件
+        run: pip install -r requirements.txt
+
+      - name: 抓盤中價格
+        run: python live.py
+
+      - name: 存回 GitHub
+        run: |
+          git config user.name "stock-bot"
+          git config user.email "stock-bot@users.noreply.github.com"
+          [ -f live.json ] || exit 0
+          git add live.json
+          git diff --cached --quiet || git commit -m "盤中價格 $(TZ=Asia/Taipei date '+%m-%d %H:%M')"
+          git pull --rebase
+          git push

@@ -21,6 +21,9 @@ import xml.etree.ElementTree as ET
 from email.utils import parsedate_to_datetime
 from datetime import datetime, timezone, timedelta
 
+import pandas as pd
+
+from official import fetch_official
 from stock_check import resolve_ticker, get_info, evaluate, verdict
 from universe import build_universe
 
@@ -111,11 +114,28 @@ def save_history(history):
         w.writerows(history[-20000:])
 
 
-def analyze(code, meta, history):
+def fill_from_official(hist, off):
+    """Yahoo 有時會漏掉最近一天（ETF 常見），用證交所／櫃買中心的官方收盤資料補上。"""
+    if not off:
+        return hist
+    day = pd.Timestamp(off["date"]).tz_localize(hist.index.tz)
+    if off["date"] in set(hist.index.strftime("%Y-%m-%d")):
+        return hist
+    # 調整後價格按前一天的調整比例估算，避免除權息後算錯報酬
+    before = hist[hist.index < day]
+    ratio = float(before["Adj Close"].iloc[-1] / before["Close"].iloc[-1]) if "Adj Close" in hist and len(before) else 1.0
+    row = {"Open": off["open"], "High": off["high"], "Low": off["low"], "Close": off["close"],
+           "Adj Close": off["close"] * ratio, "Volume": off["volume"], "Dividends": 0.0, "Stock Splits": 0.0}
+    extra = pd.DataFrame([{k: v for k, v in row.items() if k in hist.columns}], index=[day])
+    return pd.concat([hist, extra]).sort_index()
+
+
+def analyze(code, meta, history, official):
     """一檔股票：回傳 (清單摘要, 個股頁資料, 新聞)；抓不到資料回傳 None。"""
     symbol, ticker, hist = resolve_ticker(code, period="5y", auto_adjust=False)
     if symbol is None:
         return None
+    hist = fill_from_official(hist, official.get(code))
     info = get_info(ticker)
     sc, warns, x = evaluate(symbol, hist, info)
     score = sc.total
@@ -160,9 +180,10 @@ def main():
 
     rows, all_news = [], []
     universe = build_universe()
+    official = fetch_official()
     for i, (code, meta) in enumerate(universe.items(), 1):
         try:
-            result = analyze(code, meta, history)
+            result = analyze(code, meta, history, official)
         except Exception as e:  # 一檔出錯不要影響其他檔
             print(f"[{i}/{len(universe)}] {code} 失敗：{e}")
             continue
