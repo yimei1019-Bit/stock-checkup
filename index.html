@@ -157,6 +157,44 @@
   .foot { font-size: .78rem; color: var(--muted); display: grid; gap: 4px; }
   .foot a { color: var(--muted); }
   @media (max-width: 380px) { .srow { grid-template-columns: 2.2rem minmax(0, 1fr) 3.2rem 5rem; gap: 8px; padding-inline: 10px; } }
+  /* 持股、提醒、紅綠燈 */
+  .tabs button { font-size: .88rem; }
+  .total { background: var(--ink); color: var(--ink-fg); border-radius: 14px; padding: 14px 16px; display: grid; gap: 8px; }
+  .total .big { font-family: var(--serif); font-size: 1.9rem; line-height: 1.1; }
+  .total .up { color: #ff8a80; } .total .down { color: #5fe39a; }
+  .total .muted { color: var(--ink-muted); }
+  .total-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; font-size: .8rem; }
+  .total-grid span { display: block; color: var(--ink-muted); font-size: .72rem; }
+  .addbtn { border: 1px solid var(--line); background: var(--panel); border-radius: 999px; padding: 3px 12px; font-size: .82rem; cursor: pointer; color: var(--accent); font-weight: 700; }
+  .hcard { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px; display: grid; gap: 8px; cursor: pointer; text-align: left; width: 100%; }
+  .hcard.danger { border-color: var(--up); box-shadow: inset 4px 0 0 var(--up); }
+  .hcard .pl { text-align: right; }
+  .hcard .pl b { display: block; font-size: 1.05rem; }
+  .hmeta { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; font-size: .78rem; color: var(--muted); }
+  .hmeta b { display: block; color: var(--fg); font-weight: 500; font-size: .86rem; }
+  .fillme { color: var(--accent); font-size: .84rem; font-weight: 700; }
+  .lights { display: flex; flex-wrap: wrap; gap: 4px 6px; }
+  .lights span { font-size: .74rem; padding: 1px 8px; border-radius: 999px; background: var(--chip); white-space: nowrap; }
+  .hero .lights span { background: rgba(255,255,255,.1); color: var(--ink-fg); }
+  .alerts { background: var(--up-soft); border: 1px solid var(--up); border-radius: 14px; padding: 12px 14px; display: grid; gap: 6px; }
+  .alerts h3 { margin: 0; font-size: .95rem; color: var(--up); }
+  .alerts button { border: 0; background: none; padding: 0; text-align: left; cursor: pointer; font-size: .86rem; }
+  .alerts button b { margin-right: 4px; }
+  .sheet-bg { position: fixed; inset: 0; background: rgba(0,0,0,.45); z-index: 50; display: flex; align-items: flex-end; justify-content: center; }
+  .sheet { background: var(--panel); width: 100%; max-width: 32rem; border-radius: 18px 18px 0 0; padding: 18px max(16px, env(safe-area-inset-right)) calc(18px + env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left)); display: grid; gap: 12px; max-height: 90vh; overflow-y: auto; }
+  .sheet h3 { margin: 0; }
+  .sheet label { display: grid; gap: 4px; font-size: .84rem; }
+  .sheet input, .sheet select { font: inherit; font-size: 16px; padding: 9px 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--bg); color: var(--fg); width: 100%; }
+  .sheet .hint { color: var(--muted); font-size: .76rem; }
+  .sheet .btns { display: flex; gap: 8px; }
+  .sheet .btns button { flex: 1; border: 0; border-radius: 10px; padding: 10px; font-weight: 700; cursor: pointer; }
+  .btn-main { background: var(--ink); color: var(--ink-fg); }
+  .btn-sub { background: var(--chip); }
+  .btn-del { background: none; color: var(--up); font-weight: 500 !important; flex: 0 0 auto !important; }
+  dl.gloss { margin: 0; display: grid; gap: 8px; font-size: .84rem; }
+  dl.gloss dt { font-weight: 700; }
+  dl.gloss dd { margin: 0; color: var(--muted); }
+  details.more > summary { cursor: pointer; color: var(--accent); font-size: .86rem; font-weight: 500; }
   @media (max-width: 330px) { .srow { grid-template-columns: 2.2rem minmax(0, 1fr) 5rem; } .srow .spark { display: none; } .summary { grid-template-columns: 1fr 1fr; } .summary .stat:last-child { grid-column: span 2; } }
 </style>
 </head>
@@ -173,7 +211,8 @@
         <div class="results" id="results" hidden></div>
       </div>
       <nav class="tabs" role="tablist">
-        <button role="tab" data-tab="mine" aria-selected="true">自選</button>
+        <button role="tab" data-tab="hold" aria-selected="true">持股</button>
+        <button role="tab" data-tab="mine" aria-selected="false">自選</button>
         <button role="tab" data-tab="rank" aria-selected="false">排行</button>
         <button role="tab" data-tab="sector" aria-selected="false">類股</button>
         <button role="tab" data-tab="news" aria-selected="false">新聞</button>
@@ -183,8 +222,20 @@
 
   <main class="gutter">
     <div class="inner">
-      <section id="tab-mine">
-        <p class="muted" id="price-note" style="margin:0 0 10px"></p>
+      <p class="muted" id="price-note" style="margin:0"></p>
+      <div class="alerts" id="alerts" hidden></div>
+
+      <section id="tab-hold">
+        <div class="total" id="hold-total"></div>
+        <div class="bar-row" style="margin-top:14px">
+          <h2>我的持股</h2>
+          <button class="addbtn" id="hold-add" type="button">＋ 新增持股</button>
+        </div>
+        <p class="muted" style="margin:4px 0 8px">點任一檔可以填寫或修改股數、買進價格和「警戒價」。資料只存在這支手機上，別人看不到。</p>
+        <div style="display:grid;gap:8px" id="hold-list"></div>
+      </section>
+
+      <section id="tab-mine" hidden>
         <div class="summary" id="mine-summary"></div>
         <div class="bar-row" style="margin-top:14px">
           <h2>我的自選股</h2>
@@ -244,6 +295,32 @@
   </main>
 </div>
 
+<!-- 編輯持股 -->
+<div class="sheet-bg" id="sheet" hidden>
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="sheet-title">
+    <h3 id="sheet-title">編輯持股</h3>
+    <label id="sheet-pick-wrap">股票
+      <select id="sheet-pick"></select>
+    </label>
+    <label>股數
+      <input id="sheet-shares" type="number" inputmode="numeric" min="0" step="1" placeholder="例如 1000（1 張 = 1000 股）">
+      <span class="hint">零股就填實際股數，例如 50。</span>
+    </label>
+    <label>平均買進價格（每股）
+      <input id="sheet-cost" type="number" inputmode="decimal" min="0" step="0.01" placeholder="例如 2200">
+    </label>
+    <label>警戒價（跌破就提醒我）
+      <input id="sheet-alert" type="number" inputmode="decimal" min="0" step="0.01" placeholder="可以空白">
+      <span class="hint" id="sheet-alert-hint">空白的話，預設是買進價再跌 10%。</span>
+    </label>
+    <div class="btns">
+      <button type="button" class="btn-del" id="sheet-del">刪除</button>
+      <button type="button" class="btn-sub" id="sheet-cancel">取消</button>
+      <button type="button" class="btn-main" id="sheet-save">儲存</button>
+    </div>
+  </div>
+</div>
+
 <!-- 個股頁 -->
 <div id="detail" hidden>
   <header class="appbar gutter">
@@ -263,10 +340,18 @@
         <div id="d-chg"></div>
       </div>
       <div class="score-line" id="d-score"></div>
+      <div class="lights" id="d-lights" style="flex-basis:100%"></div>
     </div>
   </div>
   <main class="gutter">
     <div class="inner" id="d-body">
+      <div class="card" id="d-hold">
+        <div class="bar-row">
+          <h3>我的持股</h3>
+          <button class="addbtn" id="d-hold-edit" type="button">＋ 加入持股</button>
+        </div>
+        <div id="d-hold-body"></div>
+      </div>
       <div class="card">
         <h3 id="d-day-title">最新一天</h3>
         <div class="ohlc" id="d-ohlc"></div>
@@ -303,6 +388,20 @@
         <div id="d-detail"></div>
         <p class="small bad" id="d-warn"></p>
         <p class="small" id="d-stop"></p>
+        <details class="more">
+          <summary>看不懂？名詞白話解釋</summary>
+          <dl class="gloss">
+            <dt>均線（月線、季線、年線）</dt><dd>過去 20、60、200 天的平均價格。股價在均線上面，代表最近買的人大多有賺，走勢偏強；跌破均線代表偏弱。</dd>
+            <dt>本益比</dt><dd>股價是公司一年每股賺的錢的幾倍。15 倍以下算便宜，40 倍以上代表大家期待很高，一旦賺得不如預期就容易大跌（例如這次的台達電）。</dd>
+            <dt>股價淨值比</dt><dd>股價是公司每股「家當」的幾倍。越高代表越貴。</dd>
+            <dt>殖利率</dt><dd>一年配的股息除以股價。4% 代表放 100 元一年約拿回 4 元股息。</dd>
+            <dt>ROE</dt><dd>公司用股東的錢，一年能賺幾 %。15% 以上算很會賺錢。</dd>
+            <dt>RSI</dt><dd>最近買氣的強弱，0～100。超過 75 代表漲太快、容易回檔；低於 30 代表跌很多。</dd>
+            <dt>MACD</dt><dd>看漲跌力道有沒有在變強。柱子是正的代表往上的力道比較大。</dd>
+            <dt>波動</dt><dd>股價平常上下跳動的幅度。數字越大，一個月內大漲大跌 10～20% 越常見。</dd>
+            <dt>停損</dt><dd>事先決定「跌到這裡就認錯賣掉」，避免小賠變大賠。</dd>
+          </dl>
+        </details>
       </div>
       <div class="card">
         <h3>相關新聞</h3>
@@ -352,6 +451,162 @@
   mine = mine.filter((c) => BY[c]);
   const saveMine = () => store.set('mine', mine);
 
+  // ---------- 我的持股（存在這支手機） ----------
+  // 每筆 {code, shares, cost, alert}；第一次打開先放使用者告訴我們的 6 檔，股數、價格由使用者填
+  let hold = store.get('hold', null);
+  if (!Array.isArray(hold)) {
+    hold = [['006208'], ['00878'], ['00919'], ['2609'], ['2330'], ['2308', 2200]]
+      .filter(([c]) => BY[c]).map(([code, cost]) => ({ code, shares: null, cost: cost || null, alert: null }));
+  }
+  hold = hold.filter((h) => BY[h.code]);
+  const saveHold = () => store.set('hold', hold);
+  const alertPrice = (h) => h.alert || (h.cost ? +(h.cost * 0.9).toFixed(2) : null);
+  const money = (v) => (v < 0 ? '-' : '') + '$' + Math.round(Math.abs(v)).toLocaleString('zh-TW');
+  const signMoney = (v) => (v > 0 ? '+' : '') + money(v);
+  function holdCalc(h) {
+    const s = BY[h.code];
+    if (!s || !h.shares || !h.cost) return null;
+    const value = s.price * h.shares, cost = h.cost * h.shares;
+    const prev = s.price / (1 + s.chg_1d / 100);
+    return { value, cost, pl: value - cost, plPct: (value / cost - 1) * 100, today: (s.price - prev) * h.shares };
+  }
+
+  // ---------- 白話紅綠燈 ----------
+  function lights(s) {
+    const out = [];
+    const L = (v, good, mid, g, m, b) => (v == null ? null : v >= good ? '🟢 ' + g : v >= mid ? '🟡 ' + m : '🔴 ' + b);
+    for (const x of [
+      L(s.quality, 60, 35, '公司會賺錢', '公司體質普通', '公司體質弱'),
+      L(s.valuation, 60, 35, '價格不貴', '價格合理', '價格偏貴'),
+      L(s.trend, 60, 35, '股價往上走', '股價盤整', '股價往下走'),
+      L(s.risk, 60, 35, '漲跌溫和', '漲跌中等', '漲跌很大'),
+    ]) if (x) out.push(x);
+    return out;
+  }
+  const lightsEl = (s) => { const d = el('div', 'lights'); lights(s).forEach((t) => d.append(el('span', null, t))); return d; };
+
+  // ---------- 需要注意 ----------
+  function drawAlerts() {
+    const items = [];
+    const seen = new Set();
+    for (const h of hold) {
+      const s = BY[h.code], a = alertPrice(h);
+      if (!s) continue;
+      if (a && s.price < a) { items.push([s, '跌破你的警戒價 ' + fmt(a) + '（現在 ' + fmt(s.price) + '）']); seen.add(s.code); }
+    }
+    const watch = new Set([...hold.map((h) => h.code), ...mine]);
+    for (const c of watch) {
+      const s = BY[c];
+      if (!s) continue;
+      if (s.chg_1d <= -7) items.push([s, '今天大跌 ' + sign(s.chg_1d) + '，先看新聞找原因']);
+      else if (s.chg_1d >= 7) items.push([s, '今天大漲 ' + sign(s.chg_1d) + '，不要急著追高']);
+      if (s.score_change != null && s.score_change <= -10) items.push([s, '健檢分數比昨天少 ' + -s.score_change + ' 分']);
+    }
+    const box = $('#alerts');
+    box.hidden = !items.length;
+    if (!items.length) return;
+    box.replaceChildren(el('h3', null, '⚠️ 需要注意（' + items.length + '）'), ...items.map(([s, msg]) => {
+      const b = el('button'); b.type = 'button';
+      b.append(el('b', null, s.name), document.createTextNode(msg + ' ›'));
+      b.addEventListener('click', () => openStock(s.code));
+      return b;
+    }));
+  }
+
+  function drawHold() {
+    let value = 0, cost = 0, today = 0, n = 0;
+    hold.forEach((h) => { const c = holdCalc(h); if (c) { value += c.value; cost += c.cost; today += c.today; n++; } });
+    const t = $('#hold-total');
+    if (n) {
+      const pl = value - cost, pct = (value / cost - 1) * 100;
+      const big = el('div', 'big ' + dir(pl), signMoney(pl));
+      const grid = el('div', 'total-grid');
+      const cell = (label, v, cls) => { const d = el('div'); d.append(el('span', null, label), el('b', cls || null, v)); return d; };
+      grid.append(cell('報酬率', sign(pct), dir(pct)), cell('今天', signMoney(today), dir(today)), cell('目前市值', money(value)));
+      t.replaceChildren(el('span', 'muted', '總損益（' + n + ' 檔已填資料）'), big, grid);
+    } else {
+      t.replaceChildren(el('b', null, '還沒有填持股資料'), el('span', 'muted', '點下面的股票，填上股數和買進價格，就會幫你算賺賠。'));
+    }
+    $('#hold-list').replaceChildren(...(hold.length ? hold.map((h) => {
+      const s = BY[h.code], c = holdCalc(h), a = alertPrice(h);
+      const card = el('button', 'hcard' + (a && s.price < a ? ' danger' : '')); card.type = 'button';
+      card.addEventListener('click', () => openSheet(h.code));
+      const top = el('div', 'row'), nm = el('div', 'sname');
+      nm.append(el('b', null, s.name), el('small', null, s.code + '・現價 ' + fmt(s.price) + ' '), el('small', dir(s.chg_1d), sign(s.chg_1d)));
+      if (s.live) nm.append(el('small', 'live', '・盤中 ' + s.live.time));
+      const pl = el('div', 'pl');
+      if (c) pl.append(el('b', dir(c.pl), signMoney(c.pl)), el('span', dir(c.plPct), sign(c.plPct)));
+      else pl.append(el('span', 'fillme', '點這裡填資料 ›'));
+      top.append(nm, pl);
+      card.append(top);
+      if (c) {
+        const m = el('div', 'hmeta');
+        const cell = (k, v) => { const d = el('div', null, k); d.append(el('b', null, v)); return d; };
+        m.append(cell('股數', fmt(h.shares)), cell('買進價', fmt(h.cost)), cell('警戒價', a ? fmt(a) : '－'));
+        card.append(m);
+      }
+      card.append(lightsEl(s));
+      return card;
+    }) : [el('div', 'empty', '還沒有持股，按「＋ 新增持股」加入。')]));
+    drawAlerts();
+  }
+
+  // 編輯持股的視窗
+  let sheetCode = null;
+  function openSheet(code) {
+    sheetCode = code;
+    const h = hold.find((x) => x.code === code) || {};
+    const pick = $('#sheet-pick');
+    $('#sheet-pick-wrap').hidden = !!code;
+    if (!code) {
+      pick.replaceChildren(...D.stocks.slice().sort((a, b) => a.code.localeCompare(b.code)).filter((s) => !hold.some((x) => x.code === s.code)).map((s) => new Option(s.code + ' ' + s.name, s.code)));
+    }
+    $('#sheet-title').textContent = code ? BY[code].name + ' ' + code : '新增持股';
+    $('#sheet-shares').value = h.shares ?? '';
+    $('#sheet-cost').value = h.cost ?? '';
+    $('#sheet-alert').value = h.alert ?? '';
+    $('#sheet-del').hidden = !code || !hold.some((x) => x.code === code);
+    $('#sheet').hidden = false;
+    setTimeout(() => $('#sheet-shares').focus(), 50);
+  }
+  const closeSheet = () => { $('#sheet').hidden = true; };
+  $('#hold-add').addEventListener('click', () => openSheet(null));
+  $('#sheet-cancel').addEventListener('click', closeSheet);
+  $('#sheet').addEventListener('click', (e) => { if (e.target.id === 'sheet') closeSheet(); });
+  $('#sheet-save').addEventListener('click', () => {
+    const code = sheetCode || $('#sheet-pick').value;
+    if (!code) return;
+    const num = (id) => { const v = parseFloat($(id).value); return isFinite(v) && v > 0 ? v : null; };
+    const rec = { code, shares: num('#sheet-shares'), cost: num('#sheet-cost'), alert: num('#sheet-alert') };
+    const i = hold.findIndex((x) => x.code === code);
+    if (i >= 0) hold[i] = rec; else hold.push(rec);
+    saveHold(); closeSheet(); drawHold();
+    if (!$('#detail').hidden && current === code) drawDetailHold(code);
+  });
+  $('#sheet-del').addEventListener('click', () => {
+    hold = hold.filter((x) => x.code !== sheetCode);
+    saveHold(); closeSheet(); drawHold();
+    if (!$('#detail').hidden && current === sheetCode) drawDetailHold(sheetCode);
+  });
+  function drawDetailHold(code) {
+    const h = hold.find((x) => x.code === code), c = h && holdCalc(h), a = h && alertPrice(h);
+    $('#d-hold-edit').textContent = h ? '編輯' : '＋ 加入持股';
+    const body = $('#d-hold-body');
+    if (!h) { body.replaceChildren(el('p', 'muted', '有買這檔的話，按「加入持股」填股數和價格，就會幫你算賺賠。')); return; }
+    if (!c) { body.replaceChildren(el('p', 'fillme', '還沒填股數或買進價格，按「編輯」填寫。')); return; }
+    const s = BY[code];
+    const m = el('div', 'hmeta');
+    const cell = (k, v, cls) => { const d = el('div', null, k); d.append(el('b', cls || null, v)); return d; };
+    m.append(cell('損益', signMoney(c.pl), dir(c.pl)), cell('報酬率', sign(c.plPct), dir(c.plPct)), cell('今天', signMoney(c.today), dir(c.today)),
+      cell('股數', fmt(h.shares)), cell('買進價', fmt(h.cost)), cell('警戒價', a ? fmt(a) : '－'));
+    const nodes = [m];
+    if (a && s.price < a) nodes.push(el('p', 'small up', '⚠️ 已經跌破你的警戒價 ' + fmt(a) + '。照你事先訂的規則處理，不要臨時改主意。'));
+    const back = h.cost / s.price - 1;
+    if (c.pl < 0) nodes.push(el('p', 'muted', '要回到你的買進價，股價需要再漲 ' + (back * 100).toFixed(1) + '%。'));
+    body.replaceChildren(...nodes);
+  }
+  $('#d-hold-edit').addEventListener('click', () => openSheet(current));
+
   // ---------- 共用：股票列 ----------
   const NS = 'http://www.w3.org/2000/svg';
   const svgEl = (tag, attrs) => { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); return e; };
@@ -383,11 +638,11 @@
   }
 
   // ---------- 分頁 ----------
-  let tab = store.get('tab', 'mine');
+  let tab = store.get('tab2', 'hold');
   function showTab(t) {
-    tab = t; store.set('tab', t);
+    tab = t; store.set('tab2', t);
     $$('.tabs button').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.tab === t)));
-    ['mine', 'rank', 'sector', 'news'].forEach((k) => { $('#tab-' + k).hidden = k !== t; });
+    ['hold', 'mine', 'rank', 'sector', 'news'].forEach((k) => { $('#tab-' + k).hidden = k !== t; });
     if (t === 'news') drawNews();
   }
   $$('.tabs button').forEach((b) => b.addEventListener('click', () => showTab(b.dataset.tab)));
@@ -612,6 +867,8 @@
     meta.style.textAlign = 'right';
     meta.append(el('b', null, s.grade), el('div', 'muted', s.score_change == null ? '健檢分數' : s.score_change === 0 ? '分數和昨天一樣' : '比昨天 ' + (s.score_change > 0 ? '+' : '') + s.score_change + ' 分'));
     $('#d-score').replaceChildren(meta, ring(s.score));
+    $('#d-lights').replaceChildren(...lightsEl(s).childNodes);
+    drawDetailHold(code);
     paintStar(); kRange();
     ['#d-ohlc', '#d-range', '#d-years', '#d-detail', '#d-news', '#k-legend'].forEach((sel) => $(sel).replaceChildren());
     $('#d-warn').textContent = ''; $('#d-stop').textContent = '';
@@ -712,11 +969,11 @@
     if (!n) return;
     $('#price-note').replaceChildren(el('span', 'live', '盤中價格 ' + md(live.date) + ' ' + live.time),
       document.createTextNode('（交易時間約每 20 分鐘更新，比券商 App 慢）。分數和走勢線是前一個交易日收盤算的。'));
-    drawMine(); drawRank();
+    drawMine(); drawRank(); drawHold();
     if (!$('#detail').hidden && current) showDetail(current);
   }
 
-  drawMine(); drawRank(); drawSectors(); showTab(tab);
+  drawHold(); drawMine(); drawRank(); drawSectors(); showTab(tab);
   loadLive();
   route();
 })();
